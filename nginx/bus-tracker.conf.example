@@ -1,0 +1,18 @@
+# Bus Tracker — nginx config example
+#
+# Add these locations inside your server {} block.
+# Configure SSL, server_name, auth_basic etc. yourself.
+
+# Serve frontend
+location = /buses.html {}
+
+# Proxy API requests to Node.js backend
+location /bus-api/ {
+    limit_req zone=api burst=20 nodelay;
+    proxy_pass http://127.0.0.1:8181/api/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}

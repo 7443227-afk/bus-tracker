@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Bus Tracker — Lignes d'Azur</title>
+  <style>
+    :root {
+      --bg: #0a0e17;
+      --bg-card: #0f172a;
+      --text: #e2e8f0;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+      --border: rgba(148,163,184,0.08);
+      --border-light: rgba(148,163,184,0.04);
+      --accent: #2563eb;
+      --rt-bg: rgba(34,197,94,0.15);
+      --rt-text: #4ade80;
+      --red: #ef4444;
+      --overlay: rgba(0,0,0,0.5);
+      --select-bg: rgba(2,6,23,0.6);
+      --btn-sec-bg: rgba(148,163,184,0.08);
+      --drawer-bg: #0f172a;
+      --drawer-border: rgba(148,163,184,0.1);
+    }
+    body.day {
+      --bg: #f1f5f9;
+      --bg-card: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --text-dim: #475569;
+      --border: rgba(100,116,139,0.15);
+      --border-light: rgba(100,116,139,0.08);
+      --accent: #2563eb;
+      --rt-bg: rgba(34,197,94,0.12);
+      --rt-text: #16a34a;
+      --red: #dc2626;
+      --overlay: rgba(0,0,0,0.2);
+      --select-bg: #ffffff;
+      --btn-sec-bg: rgba(100,116,139,0.08);
+      --drawer-bg: #ffffff;
+      --drawer-border: rgba(100,116,139,0.12);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+      transition: background 0.25s, color 0.25s;
+    }
+
+    /* ——— Drawer ——— */
+    .drawer-overlay {
+      position: fixed; inset: 0; z-index: 98;
+      background: var(--overlay);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .drawer-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .drawer {
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 99;
+      width: 80vw; max-width: 340px;
+      background: var(--drawer-bg);
+      border-right: 1px solid var(--drawer-border);
+      padding: 0;
+      transform: translateX(-100%);
+      transition: transform 0.3s cubic-bezier(.22,.68,0,1), background 0.25s;
+      overflow-y: auto;
+    }
+    .drawer.open { transform: translateX(0); }
+
+    .drawer-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .drawer-header h2 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.01em; }
+    .drawer-close {
+      background: none; border: none; color: var(--text-dim); font-size: 1.5rem;
+      cursor: pointer; padding: 4px 8px; border-radius: 8px;
+    }
+    .drawer-close:active { background: rgba(148,163,184,0.1); }
+
+    .drawer-section { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+    .drawer-section:last-child { border-bottom: none; }
+    .drawer-label {
+      display: block; font-size: 0.78rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 10px;
+    }
+
+    .drawer-select {
+      width: 100%; min-height: 44px;
+      border-radius: 10px; border: 1px solid var(--border);
+      background: var(--select-bg); color: var(--text);
+      padding: 0 14px; font-size: 15px; outline: none;
+      -webkit-appearance: none; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
+      margin-bottom: 8px;
+      transition: background 0.25s, color 0.25s, border 0.25s;
+    }
+    .drawer-select:focus { border-color: var(--accent); }
+
+    .drawer-btn {
+      width: 100%; min-height: 44px; border: none; border-radius: 10px;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .drawer-btn--primary { background: var(--accent); color: #fff; }
+    .drawer-btn--primary:disabled { opacity: 0.35; }
+    .drawer-btn--secondary { background: var(--btn-sec-bg); color: var(--text); }
+    .drawer-btn--secondary:disabled { opacity: 0.35; }
+
+    /* ——— Favorites in drawer ——— */
+    .fav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; border-radius: 10px;
+      cursor: pointer; margin-bottom: 4px;
+    }
+    .fav-item:active { background: var(--border); }
+    .fav-item-info { flex: 1; min-width: 0; }
+    .fav-item-route { font-weight: 700; font-size: 0.95rem; }
+    .fav-item-stop { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fav-item-del {
+      background: none; border: none; color: var(--red); font-size: 1.1rem;
+      cursor: pointer; padding: 6px; border-radius: 8px;
+    }
+    .fav-item-del:active { background: rgba(239,68,68,0.15); }
+
+    /* ——— Main screen ——— */
+    .screen {
+      display: flex; flex-direction: column;
+      min-height: 100vh; padding: 0 20px;
+    }
+
+    /* ——— Top bar ——— */
+    .topbar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 16px 0 6px;
+    }
+    .menu-btn {
+      background: none; border: none; color: var(--text-dim); font-size: 1.5rem;
+      cursor: pointer; padding: 6px; border-radius: 10px; line-height: 1;
+      flex-shrink: 0;
+    }
+    .menu-btn:active { background: var(--border); }
+    .topbar-time {
+      font-size: 0.9rem; font-weight: 600; color: var(--text-muted); letter-spacing: 0.02em;
+      font-variant-numeric: tabular-nums;
+    }
+    .theme-btn {
+      background: none; border: none; color: var(--text-dim); font-size: 1.2rem;
+      cursor: pointer; padding: 6px; border-radius: 10px; line-height: 1;
+      margin-left: auto; flex-shrink: 0;
+    }
+    .theme-btn:active { background: var(--border); }
+
+    /* ——— Route info ——— */
+    .route-hero {
+      padding: 10px 0 16px;
+    }
+    .route-number {
+      font-size: clamp(3.4rem, 16vw, 6rem);
+      font-weight: 900; letter-spacing: -0.04em; line-height: 1;
+    }
+    .route-direction {
+      font-size: 0.85rem; color: var(--text-muted); font-weight: 500;
+      margin-top: 2px; letter-spacing: 0.01em;
+    }
+    .route-stop {
+      font-size: clamp(1.4rem, 6vw, 2.2rem);
+      font-weight: 700; margin-top: 2px; letter-spacing: -0.02em;
+    }
+
+    /* ——— Divider ——— */
+    .divider {
+      height: 1px; background: var(--border); margin: 0;
+      flex-shrink: 0;
+    }
+
+    /* ——— ETA ——— */
+    .eta-block {
+      flex: 0; display: flex; flex-direction: column; align-items: center;
+      padding: 20px 0;
+    }
+    .eta-main {
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .eta-circle {
+      width: clamp(7rem, 32vw, 12rem);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      border: 4px solid var(--accent);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: var(--select-bg);
+      box-shadow: 0 0 24px rgba(37,99,235,0.15);
+    }
+    .eta-value {
+      font-size: clamp(2.8rem, 14vw, 5rem);
+      font-weight: 900; letter-spacing: -0.04em; line-height: 1;
+      margin-top: 4px;
+    }
+    .eta-unit {
+      font-size: 0.75rem; font-weight: 600; color: var(--text-muted);
+      letter-spacing: 0.03em; text-transform: uppercase;
+    }
+    .eta-side {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 10px;
+    }
+    .eta-time {
+      font-size: 1rem; color: var(--text-dim); font-weight: 500;
+    }
+    .eta-realtime {
+      display: inline-block; font-size: 0.7rem; font-weight: 700;
+      padding: 2px 8px; border-radius: 999px;
+      background: var(--rt-bg); color: var(--rt-text);
+      align-self: flex-start;
+    }
+
+    /* ——— Next departures ——— */
+    .next-wrap {
+      padding: 12px 0 8px;
+    }
+    .next-label {
+      font-size: 0.78rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 4px;
+    }
+    .next-item {
+      display: flex; align-items: baseline; gap: 8px;
+      padding: 10px 0;
+    }
+    .next-item + .next-item { border-top: 1px solid var(--border-light); }
+    .next-eta {
+      font-weight: 700; font-size: 1.2rem; font-variant-numeric: tabular-nums;
+      min-width: 3.2rem;
+    }
+    .next-time {
+      color: var(--text-dim); font-size: 0.9rem;
+    }
+    .next-unit {
+      color: var(--text-muted); font-size: 0.85rem;
+    }
+
+    /* ——— Bottom bar ——— */
+    .bottombar {
+      display: flex; gap: 10px;
+      padding: 12px 0 24px;
+    }
+    .refresh-btn {
+      flex: 1; min-height: 48px; border: none; border-radius: 12px;
+      background: var(--btn-sec-bg); color: var(--text);
+      font-size: 1rem; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      transition: background 0.25s;
+    }
+    .refresh-btn:active { background: var(--border); }
+    .refresh-btn:disabled { opacity: 0.4; }
+
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 12px 0 4px; color: var(--text-muted); font-size: 0.85rem;
+      text-decoration: none;
+    }
+
+    /* ——— Empty state ——— */
+    .empty-state {
+      flex: 1; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; text-align: center;
+      color: var(--text-muted);
+    }
+    .empty-state-icon { font-size: 2.4rem; margin-bottom: 8px; }
+    .empty-state-text { font-size: 0.95rem; line-height: 1.5; max-width: 260px; }
+
+    /* ——— Loading shimmer ——— */
+    @keyframes shimmer { 0% { opacity: 0.4; } 50% { opacity: 0.7; } 100% { opacity: 0.4; } }
+    .loading { animation: shimmer 1.2s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+
+  <!-- Drawer overlay -->
+  <div class="drawer-overlay" id="overlay"></div>
+
+  <!-- Drawer -->
+  <div class="drawer" id="drawer">
+    <div class="drawer-header">
+      <h2>🚌 Bus Tracker</h2>
+      <button class="drawer-close" id="drawer-close">✕</button>
+    </div>
+
+    <div class="drawer-section" id="drawer-favs">
+      <span class="drawer-label">⭐ Избранное</span>
+      <div id="drawer-fav-list"></div>
+    </div>
+
+    <div class="drawer-section">
+      <span class="drawer-label">Маршрут</span>
+      <select class="drawer-select" id="route-select"><option value="">— выберите —</option></select>
+      <select class="drawer-select" id="direction-select" disabled><option value="">— направление —</option></select>
+      <select class="drawer-select" id="stop-select" disabled><option value="">— остановка —</option></select>
+      <button class="drawer-btn drawer-btn--primary" id="show-btn" disabled>Показать</button>
+      <button class="drawer-btn drawer-btn--secondary" id="fav-btn" disabled style="margin-top:6px">⭐ В избранное</button>
+    </div>
+  </div>
+
+  <!-- Main screen -->
+  <div class="screen" id="screen">
+    <div class="topbar">
+      <button class="menu-btn" id="menu-btn">☰</button>
+      <span class="topbar-time" id="clock"></span>
+      <button class="theme-btn" id="theme-btn">🌙</button>
+    </div>
+
+    <!-- Empty state (no selection) -->
+    <div class="empty-state" id="empty-state">
+      <div class="empty-state-icon">🚌</div>
+      <div class="empty-state-text">Выберите маршрут, направление и остановку в меню ☰</div>
+    </div>
+
+    <!-- Active content -->
+    <div id="content" style="display:none;flex-direction:column;flex:1">
+      <div class="route-hero">
+        <div class="route-number" id="disp-route"></div>
+        <div class="route-direction" id="disp-direction"></div>
+        <div class="route-stop" id="disp-stop"></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="eta-block" id="eta-block">
+        <div id="eta-empty" style="display:none">
+          <div class="empty-state" style="flex:initial;padding:20px 0">
+            <div class="empty-state-text">Нет ближайших отправлений</div>
+          </div>
+        </div>
+        <div id="eta-main">
+          <div class="eta-main">
+            <div class="eta-circle">
+              <span class="eta-value" id="disp-eta-value"></span>
+              <span class="eta-unit">мин</span>
+            </div>
+            <div class="eta-side">
+              <span class="eta-time" id="disp-eta-time"></span>
+              <span class="eta-realtime" id="disp-rt-badge" style="display:none">реальное</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="next-wrap" id="next-wrap" style="display:none">
+        <div class="next-label">Далее</div>
+        <div id="next-list"></div>
+      </div>
+
+      <div class="bottombar">
+        <button class="refresh-btn" id="refresh-btn">🔄 Обновить</button>
+      </div>
+
+      <a class="back-link" href="/services.html">← Назад к сервисам</a>
+    </div>
+  </div>
+
+  <script>
+    const LS_KEY = 'busFavorites';
+    const LS_THEME = 'busTheme';
+    let routesData = [];
+    let autoInterval = null;
+    let currentQuery = null;
+
+    // ——— Theme ———
+    function setTheme(day) {
+      document.body.classList.toggle('day', day);
+      document.getElementById('theme-btn').textContent = day ? '☀️' : '🌙';
+      localStorage.setItem(LS_THEME, day ? 'day' : 'night');
+    }
+    document.getElementById('theme-btn').addEventListener('click', () => {
+      setTheme(!document.body.classList.contains('day'));
+    });
+    if (localStorage.getItem(LS_THEME) === 'day') setTheme(true);
+
+    // ——— Clock ———
+    function updateClock() {
+      document.getElementById('clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ——— Drawer ———
+    function openDrawer() {
+      document.getElementById('drawer').classList.add('open');
+      document.getElementById('overlay').classList.add('open');
+    }
+    function closeDrawer() {
+      document.getElementById('drawer').classList.remove('open');
+      document.getElementById('overlay').classList.remove('open');
+    }
+    document.getElementById('menu-btn').addEventListener('click', openDrawer);
+    document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+    document.getElementById('overlay').addEventListener('click', closeDrawer);
+
+    // ——— Format time ———
+    function fmtTime(ts) {
+      return new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // ——— Load routes ———
+    async function loadRoutes() {
+      const r = await fetch('/bus-api/routes');
+      routesData = await r.json();
+      const sel = document.getElementById('route-select');
+      sel.innerHTML = '<option value="">— выберите —</option>';
+      for (const rt of routesData) {
+        const opt = document.createElement('option');
+        opt.value = rt.id;
+        opt.textContent = rt.name;
+        sel.appendChild(opt);
+      }
+    }
+
+    // ——— Route select ———
+    document.getElementById('route-select').addEventListener('change', function() {
+      const rt = routesData.find(r => r.id === this.value);
+      const dirSel = document.getElementById('direction-select');
+      dirSel.innerHTML = '';
+      if (!rt || !rt.directions.length) {
+        dirSel.innerHTML = '<option value="">— нет направлений —</option>';
+        dirSel.disabled = true;
+        document.getElementById('stop-select').disabled = true;
+        document.getElementById('show-btn').disabled = true;
+        document.getElementById('fav-btn').disabled = true;
+        return;
+      }
+      dirSel.disabled = false;
+      dirSel.innerHTML = '<option value="">— направление —</option>';
+      rt.directions.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.direction;
+        opt.textContent = `${d.direction === '0' ? 'A' : 'B'} → ${d.terminalName}`;
+        dirSel.appendChild(opt);
+      });
+      document.getElementById('stop-select').disabled = true;
+      document.getElementById('show-btn').disabled = true;
+      document.getElementById('fav-btn').disabled = true;
+    });
+
+    // ——— Direction select ———
+    document.getElementById('direction-select').addEventListener('change', function() {
+      const rt = routesData.find(r => r.id === document.getElementById('route-select').value);
+      if (!rt) return;
+      const dir = rt.directions.find(d => String(d.direction) === this.value);
+      const stopSel = document.getElementById('stop-select');
+      stopSel.innerHTML = '';
+      if (!dir || !dir.stops.length) {
+        stopSel.innerHTML = '<option value="">— нет остановок —</option>';
+        stopSel.disabled = true;
+        document.getElementById('show-btn').disabled = true;
+        document.getElementById('fav-btn').disabled = true;
+        return;
+      }
+      stopSel.disabled = false;
+      stopSel.innerHTML = '<option value="">— остановка —</option>';
+      dir.stops.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.name;
+        stopSel.appendChild(opt);
+      });
+      document.getElementById('show-btn').disabled = true;
+      document.getElementById('fav-btn').disabled = true;
+    });
+
+    // ——— Stop select ———
+    document.getElementById('stop-select').addEventListener('change', function() {
+      document.getElementById('show-btn').disabled = !this.value;
+      document.getElementById('fav-btn').disabled = !this.value;
+    });
+
+    // ——— Fetch departures ———
+    async function fetchDepartures(route, direction, stop) {
+      const r = await fetch(`/bus-api/departures?stop=${stop}&route=${route}&direction=${direction}`);
+      return await r.json();
+    }
+
+    // ——— Render ———
+    function renderView(data, routeName, dirLabel, stopName) {
+      const empty = document.getElementById('empty-state');
+      const content = document.getElementById('content');
+
+      empty.style.display = 'none';
+      content.style.display = 'flex';
+
+      document.getElementById('disp-route').textContent = routeName;
+      document.getElementById('disp-direction').textContent = `Направление ${dirLabel}`;
+      document.getElementById('disp-stop').textContent = stopName;
+
+      const etaMain = document.getElementById('eta-main');
+      const etaEmpty = document.getElementById('eta-empty');
+      const nextWrap = document.getElementById('next-wrap');
+      const nextList = document.getElementById('next-list');
+
+      if (!data || data.length === 0) {
+        etaMain.style.display = 'none';
+        etaEmpty.style.display = '';
+        nextWrap.style.display = 'none';
+        return;
+      }
+
+      etaMain.style.display = '';
+      etaEmpty.style.display = 'none';
+
+      // Realtime departure → big circle
+      const rt = data.find(d => d.isRealtime);
+      const showCircle = document.getElementById('eta-main');
+
+      if (rt) {
+        showCircle.style.display = '';
+        document.getElementById('disp-eta-value').textContent = rt.etaMinutes;
+        document.getElementById('disp-eta-time').textContent = `в ${fmtTime(rt.predictedTs)}`;
+        document.getElementById('disp-rt-badge').style.display = 'inline';
+      } else {
+        showCircle.style.display = 'none';
+      }
+
+      // Schedule (non-realtime) → list below
+      const schedule = data.filter(d => !d.isRealtime);
+      nextList.innerHTML = '';
+      if (schedule.length) {
+        nextWrap.style.display = '';
+        schedule.slice(0, 3).forEach(d => {
+          const div = document.createElement('div');
+          div.className = 'next-item';
+          div.innerHTML = `
+            <span class="next-eta">${d.etaMinutes}</span>
+            <span class="next-unit">мин</span>
+            <span class="next-time">в ${fmtTime(d.predictedTs)}</span>
+          `;
+          nextList.appendChild(div);
+        });
+      } else {
+        nextWrap.style.display = 'none';
+      }
+    }
+
+    // ——— Show ———
+    document.getElementById('show-btn').addEventListener('click', async () => {
+      const route = document.getElementById('route-select').value;
+      const dir = document.getElementById('direction-select').value;
+      const stop = document.getElementById('stop-select').value;
+      const rt = routesData.find(r => r.id === route);
+      if (!rt || !stop) return;
+
+      const dirObj = rt.directions.find(d => String(d.direction) === dir);
+      const stopObj = dirObj?.stops.find(s => s.id === stop);
+      const stopName = stopObj?.name || stop;
+      const dirLabel = dir === '0' ? 'A' : 'B';
+      currentQuery = { route, dir, stop, routeName: rt.name, dirLabel, stopName };
+
+      const data = await fetchDepartures(route, dir, stop);
+      renderView(data, rt.name, dirLabel, stopName);
+      closeDrawer();
+      startAutoRefresh();
+    });
+
+    // ——— Refresh button ———
+    document.getElementById('refresh-btn').addEventListener('click', async () => {
+      if (!currentQuery) return;
+      const data = await fetchDepartures(currentQuery.route, currentQuery.dir, currentQuery.stop);
+      renderView(data, currentQuery.routeName, currentQuery.dirLabel, currentQuery.stopName);
+      startAutoRefresh();
+    });
+
+    // ——— Auto-refresh ———
+    function startAutoRefresh() {
+      if (autoInterval) clearInterval(autoInterval);
+      autoInterval = setInterval(async () => {
+        if (!currentQuery) return;
+        const data = await fetchDepartures(currentQuery.route, currentQuery.dir, currentQuery.stop);
+        renderView(data, currentQuery.routeName, currentQuery.dirLabel, currentQuery.stopName);
+      }, 30000);
+    }
+
+    // ——— Favorites ———
+    document.getElementById('fav-btn').addEventListener('click', () => {
+      const route = document.getElementById('route-select').value;
+      const dir = document.getElementById('direction-select').value;
+      const stop = document.getElementById('stop-select').value;
+      const rt = routesData.find(r => r.id === route);
+      if (!rt || !stop) return;
+      const dirObj = rt.directions.find(d => String(d.direction) === dir);
+      const stopObj = dirObj?.stops.find(s => s.id === stop);
+      const favs = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+      const key = `${route}_${dir}_${stop}`;
+      if (favs.some(f => f.key === key)) return;
+      favs.push({ key, route, dir, stop, routeName: rt.name, dirLabel: dir === '0' ? 'A' : 'B', stopName: stopObj?.name || stop });
+      localStorage.setItem(LS_KEY, JSON.stringify(favs));
+      renderFavorites();
+    });
+
+    function renderFavorites() {
+      const favs = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+      const list = document.getElementById('drawer-fav-list');
+      if (!favs.length) {
+        list.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:4px 0">Нет избранных маршрутов</div>';
+        return;
+      }
+      list.innerHTML = '';
+      favs.forEach(f => {
+        const div = document.createElement('div');
+        div.className = 'fav-item';
+        div.innerHTML = `
+          <div class="fav-item-info">
+            <div class="fav-item-route">🚌 ${f.routeName} · ${f.stopName}</div>
+            <div class="fav-item-stop">Направление ${f.dirLabel}</div>
+          </div>
+          <button class="fav-item-del" data-key="${f.key}">✕</button>
+        `;
+        div.querySelector('.fav-item-del').addEventListener('click', e => {
+          e.stopPropagation();
+          const favs2 = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+          localStorage.setItem(LS_KEY, JSON.stringify(favs2.filter(x => x.key !== f.key)));
+          renderFavorites();
+        });
+        div.addEventListener('click', async () => {
+          document.getElementById('route-select').value = f.route;
+          document.getElementById('route-select').dispatchEvent(new Event('change'));
+          await new Promise(r => setTimeout(r, 100));
+          document.getElementById('direction-select').value = f.dir;
+          document.getElementById('direction-select').dispatchEvent(new Event('change'));
+          await new Promise(r => setTimeout(r, 100));
+          document.getElementById('stop-select').value = f.stop;
+          document.getElementById('show-btn').disabled = false;
+          document.getElementById('fav-btn').disabled = false;
+          document.getElementById('show-btn').click();
+        });
+        list.appendChild(div);
+      });
+    }
+
+    // ——— Init ———
+    (async () => {
+      try { await loadRoutes(); } catch (e) { console.error(e); }
+      renderFavorites();
+    })();
+  </script>
+</body>
+</html>
